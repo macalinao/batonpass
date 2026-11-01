@@ -76,7 +76,7 @@ nix flake check      # formatting, hooks, package build with tests
 nix fmt
 ```
 
-Layout: one workspace crate, `crates/batonpass` (binary `baton`): `src/opts.rs` (bpaf args), `src/command.rs` (`{jobs}` and env), `src/main.rs` (tokens, child, signals), `tests/jobserver.rs`. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Layout: one workspace crate, `crates/batonpass` (binary `baton`): `src/opts.rs` (bpaf args), `src/command.rs` (`{jobs}` and env), `src/main.rs` (tokens, child, signals), `tests/jobserver.rs`. See [CONTRIBUTING.md](https://github.com/macalinao/batonpass/blob/master/CONTRIBUTING.md).
 
 ## Releasing
 
@@ -93,4 +93,4 @@ Still to do: make the repo public, then protect master to require CI (branch pro
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/macalinao/batonpass/blob/master/LICENSE).
