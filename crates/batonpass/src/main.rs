@@ -76,6 +76,17 @@ fn main() {
     }
 }
 
+/// Whether a signal was sent by a process (kill(2) and friends) rather than
+/// by the kernel, e.g. for ^C on the terminal.
+fn sent(origin: &Origin) -> bool {
+    match origin.cause {
+        Cause::Sent(_) => true,
+        // macOS leaves si_code unset; a sender pid still means kill(2).
+        Cause::Unknown => origin.process.is_some_and(|p| p.pid != 0),
+        _ => false,
+    }
+}
+
 /// Number of jobs wanted and the number to wait for, from `-n` and `--min`.
 fn plan(jobs: Option<usize>, min: Option<usize>, nproc: usize) -> (usize, usize) {
     let n = jobs.unwrap_or(nproc).max(1);
@@ -221,7 +232,7 @@ fn run(mut opts: Opts, env: Result<Client, jobserver::FromEnvError>) -> Result<O
             Ok(Event::Signal(origin)) => {
                 // Signals from the terminal already reach the command through
                 // its process group; forwarding those would deliver them twice.
-                if matches!(origin.cause, Cause::Sent(_)) {
+                if sent(&origin) {
                     unsafe { libc::kill(pid, origin.signal) };
                 }
             }
