@@ -43,9 +43,7 @@ mod tests {
     use super::*;
 
     fn parse(args: &[&str]) -> Result<Opts, String> {
-        opts()
-            .run_inner(args)
-            .map_err(|e| e.unwrap_stderr())
+        opts().run_inner(args).map_err(|e| e.unwrap_stderr())
     }
 
     #[test]

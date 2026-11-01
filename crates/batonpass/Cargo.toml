@@ -23,3 +23,7 @@ signal-hook.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+jobserver.workspace = true
+libc.workspace = true

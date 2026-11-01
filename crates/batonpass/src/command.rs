@@ -38,7 +38,10 @@ mod tests {
 
     #[test]
     fn substitutes_placeholder() {
-        assert_eq!(substitute(OsStr::new("--maxWorkers={jobs}"), 4), "--maxWorkers=4");
+        assert_eq!(
+            substitute(OsStr::new("--maxWorkers={jobs}"), 4),
+            "--maxWorkers=4"
+        );
         assert_eq!(substitute(OsStr::new("{jobs}{jobs}"), 12), "1212");
         assert_eq!(substitute(OsStr::new("{job}"), 3), "{job}");
         assert_eq!(substitute(OsStr::new("plain"), 3), "plain");

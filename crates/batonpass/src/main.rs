@@ -111,8 +111,8 @@ fn run(opts: Opts, env: Result<Client, jobserver::FromEnvError>) -> Result<Outco
             match opts.serve {
                 Some(size) => {
                     let size = size.max(1);
-                    let client = Client::new(size)
-                        .map_err(|e| format!("creating a jobserver: {e}"))?;
+                    let client =
+                        Client::new(size).map_err(|e| format!("creating a jobserver: {e}"))?;
                     // The command's implicit token, as cargo does.
                     client
                         .acquire_raw()
