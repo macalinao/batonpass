@@ -80,16 +80,9 @@ Layout: one workspace crate, `crates/batonpass` (binary `baton`): `src/opts.rs` 
 
 ## Releasing
 
-[release-plz](https://release-plz.dev) runs on every push to master (`.github/workflows/release-plz.yml`, only once the repo is public). It opens a release PR that bumps the version and updates `CHANGELOG.md`; merging it publishes to crates.io, tags `vX.Y.Z` and creates the GitHub release, and `release-binaries.yml` attaches the prebuilt archives (`baton-<target>.tar.gz` plus `.sha256`) that `cargo binstall` and `install.sh` download.
+[release-plz](https://release-plz.dev) runs on every push to master (`.github/workflows/release-plz.yml`). It opens a release PR that bumps the version and updates `CHANGELOG.md`; merging it publishes to crates.io, tags `vX.Y.Z` and creates the GitHub release, and `release-binaries.yml` attaches the prebuilt archives (`baton-<target>.tar.gz` plus `.sha256`) that `cargo binstall` and `install.sh` download.
 
-crates.io uses trusted publishing (OIDC via `rust-lang/crates-io-auth-action`); there is no `CARGO_REGISTRY_TOKEN` secret. Trusted publishing needs the crate to exist, so **0.1.0 is published by hand once**:
-
-1. `cargo publish -p batonpass`, then on crates.io add a trusted publisher: repo `macalinao/batonpass`, workflow `release-plz.yml`.
-2. `git tag v0.1.0 && git push origin v0.1.0`, `gh release create v0.1.0 --generate-notes`, then run `release-binaries.yml` for `v0.1.0` (`gh workflow run release-binaries.yml -f tag=v0.1.0`).
-
-Do step 1 before the repo goes public: from then on each push to master runs the release job, which fails until the trusted publisher exists.
-
-Still to do: make the repo public, then protect master to require CI (branch protection on private repos needs a paid plan). Optionally add a `RELEASE_PLZ_TOKEN` secret (GitHub App token or PAT) so CI runs on release PRs.
+crates.io uses trusted publishing (OIDC via `rust-lang/crates-io-auth-action`, trusted publisher: workflow `release-plz.yml`); there is no `CARGO_REGISTRY_TOKEN` secret. The release PR is opened by the `macalinao-release-bot` GitHub App (secrets `RELEASE_PLZ_APP_CLIENT_ID` and `RELEASE_PLZ_APP_PRIVATE_KEY`), because PRs opened with `GITHUB_TOKEN` don't run CI and master requires the `ci` check.
 
 ## License
 
