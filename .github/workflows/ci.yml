@@ -38,6 +38,15 @@ jobs:
       - name: cargo test
         run: nix develop --command cargo test --workspace
 
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
   clippy:
     runs-on: ubuntu-latest
     steps:
@@ -52,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -60,6 +69,25 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --locked
+
+  doc:
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --workspace --no-deps --locked
+
+  # Catches a broken crates.io package before release-plz publishes it.
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo publish --dry-run -p batonpass --locked
 
   # Keep in sync with rust-version in Cargo.toml.
   msrv:
@@ -77,3 +105,13 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check advisories bans licenses sources
+
+  # The one check branch protection requires.
+  ci:
+    if: always()
+    needs: [nix, fmt, clippy, test, doc, package, msrv, deny]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All jobs passed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: exit 1
