@@ -1,4 +1,4 @@
-# Runs from .github/workflows/release-plz.yml once the repo is public.
+# Runs from .github/workflows/release-plz.yml.
 [workspace]
 changelog_update = true
 git_tag_enable = true
@@ -6,3 +6,8 @@ git_tag_enable = true
 git_tag_name = "v{{ version }}"
 git_release_enable = true
 publish = true
+
+[[package]]
+name = "batonpass"
+# One crate: keep the changelog at the repo root, next to the README.
+changelog_path = "CHANGELOG.md"
