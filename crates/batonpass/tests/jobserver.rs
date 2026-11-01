@@ -78,12 +78,29 @@ fn stdout(out: &Output) -> String {
     String::from_utf8_lossy(&out.stdout).trim().to_owned()
 }
 
-/// Bytes waiting in a pipe or fifo, i.e. free tokens.
-fn queued(file: &File) -> usize {
-    let mut n: libc::c_int = 0;
-    let rc = unsafe { libc::ioctl(file.as_raw_fd(), libc::FIONREAD, &mut n) };
-    assert_eq!(rc, 0, "FIONREAD");
-    n as usize
+/// Free tokens in a fifo: drains it without blocking and writes the bytes
+/// back. (FIONREAD on a fifo reads 0 on macOS.)
+fn queued(mut fifo: &File) -> usize {
+    let fd = fifo.as_raw_fd();
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    assert!(flags >= 0, "F_GETFL");
+    assert_eq!(
+        unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) },
+        0
+    );
+    let mut tokens = Vec::new();
+    let mut buf = [0; 64];
+    loop {
+        match fifo.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => tokens.extend_from_slice(&buf[..n]),
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+            Err(e) => panic!("read fifo: {e}"),
+        }
+    }
+    assert_eq!(unsafe { libc::fcntl(fd, libc::F_SETFL, flags) }, 0);
+    fifo.write_all(&tokens).expect("refill fifo");
+    tokens.len()
 }
 
 #[test]
@@ -120,6 +137,7 @@ fn fifo_jobserver_gets_back_the_exact_bytes() {
         .expect("open fifo");
     // steve hands out NUL bytes; they must come back unchanged.
     fifo.write_all(&[0, 0, 0]).expect("fill fifo");
+    assert_eq!(queued(&fifo), 3);
 
     let child = baton(None)
         .env(
