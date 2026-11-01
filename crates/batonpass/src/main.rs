@@ -1,8 +1,10 @@
 mod command;
 mod opts;
 
+use std::ffi::OsStr;
 use std::io;
 use std::os::unix::process::ExitStatusExt;
+use std::path::Path;
 use std::process::{Command, ExitStatus};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -15,6 +17,9 @@ use signal_hook::low_level::siginfo::{Cause, Origin};
 
 use crate::command::{job_env, substitute};
 use crate::opts::Opts;
+
+/// Gentoo's system-wide jobserver.
+const STEVE: &str = "/dev/steve";
 
 /// Signals passed on to the command. SIGUSR1 is left alone: the jobserver
 /// crate's helper thread uses it to interrupt a blocked read.
@@ -80,7 +85,30 @@ fn plan(jobs: Option<usize>, min: Option<usize>, nproc: usize) -> (usize, usize)
     (n, min.clamp(1, n))
 }
 
-fn run(opts: Opts, env: Result<Client, jobserver::FromEnvError>) -> Result<Outcome, String> {
+/// Whether an env flag like `BATON_VERBOSE` is on: set, and not empty, `0`,
+/// `false` or `no`.
+fn env_flag(value: Option<&OsStr>) -> bool {
+    value.is_some_and(|v| {
+        !(v.is_empty()
+            || v == "0"
+            || v.eq_ignore_ascii_case("false")
+            || v.eq_ignore_ascii_case("no"))
+    })
+}
+
+/// The warning for a steve fifo that MAKEFLAGS doesn't point at.
+fn steve_warning(no_jobserver: bool, steve_exists: bool) -> Option<String> {
+    (no_jobserver && steve_exists).then(|| {
+        format!(
+            "baton: warning: {STEVE} exists but MAKEFLAGS has no jobserver; \
+             set MAKEFLAGS=--jobserver-auth=fifo:{STEVE} to share it"
+        )
+    })
+}
+
+fn run(mut opts: Opts, env: Result<Client, jobserver::FromEnvError>) -> Result<Outcome, String> {
+    opts.verbose |= env_flag(std::env::var_os("BATON_VERBOSE").as_deref());
+    opts.require |= env_flag(std::env::var_os("BATON_REQUIRE").as_deref());
     let nproc = thread::available_parallelism().map_or(1, |n| n.get());
     let (n, min) = plan(opts.jobs, opts.min, nproc);
 
@@ -102,10 +130,21 @@ fn run(opts: Opts, env: Result<Client, jobserver::FromEnvError>) -> Result<Outco
     let source = match env {
         Ok(client) => Source::Env(client),
         Err(e) => {
-            if !matches!(
+            let none = matches!(
                 e.kind(),
                 FromEnvErrorKind::NoEnvVar | FromEnvErrorKind::NoJobserver
-            ) {
+            );
+            if let Some(warning) = steve_warning(none, Path::new(STEVE).exists()) {
+                eprintln!("{warning}");
+            }
+            if opts.require {
+                return Err(if none {
+                    "--require: no jobserver in MAKEFLAGS, CARGO_MAKEFLAGS or MFLAGS".into()
+                } else {
+                    format!("--require: unusable jobserver: {e}")
+                });
+            }
+            if !none {
                 eprintln!("baton: ignoring jobserver: {e}");
             }
             match opts.serve {
@@ -256,7 +295,25 @@ fn acquire(
 
 #[cfg(test)]
 mod tests {
-    use super::plan;
+    use super::*;
+
+    #[test]
+    fn env_flag_values() {
+        for on in ["1", "true", "yes", "TRUE"] {
+            assert!(env_flag(Some(OsStr::new(on))), "{on}");
+        }
+        for off in ["", "0", "false", "No"] {
+            assert!(!env_flag(Some(OsStr::new(off))), "{off}");
+        }
+        assert!(!env_flag(None));
+    }
+
+    #[test]
+    fn warns_about_unused_steve() {
+        assert!(steve_warning(true, true).is_some_and(|w| w.contains("fifo:/dev/steve")));
+        assert_eq!(steve_warning(true, false), None);
+        assert_eq!(steve_warning(false, true), None);
+    }
 
     #[test]
     fn plan_defaults_to_nproc_without_waiting() {

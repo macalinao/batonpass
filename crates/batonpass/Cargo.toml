@@ -10,6 +10,7 @@ readme.workspace = true
 keywords.workspace = true
 categories.workspace = true
 authors.workspace = true
+rust-version.workspace = true
 
 [[bin]]
 name = "baton"
@@ -27,3 +28,9 @@ workspace = true
 [dev-dependencies]
 jobserver.workspace = true
 libc.workspace = true
+
+# `cargo binstall batonpass` fetches the archives release-binaries.yml uploads.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/baton-{ target }{ archive-suffix }"
+bin-dir = "baton{ binary-ext }"
+pkg-fmt = "tgz"
