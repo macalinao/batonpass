@@ -29,7 +29,11 @@ pub struct Opts {
     #[bpaf(long, argument("N"))]
     pub serve: Option<usize>,
 
-    /// Print the grant to stderr
+    /// Fail if there is no jobserver in the environment (or BATON_REQUIRE=1)
+    #[bpaf(long)]
+    pub require: bool,
+
+    /// Print the grant to stderr (or BATON_VERBOSE=1)
     #[bpaf(short, long)]
     pub verbose: bool,
 
@@ -56,6 +60,13 @@ mod tests {
         assert_eq!(o.min, Some(2));
         assert_eq!(o.set, ["A", "B"]);
         assert_eq!(o.command, ["vitest", "-x"]);
+        assert!(!o.require && !o.verbose);
+    }
+
+    #[test]
+    fn parses_require_and_verbose() {
+        let o = parse(&["--require", "-v", "--", "true"]).expect("parses");
+        assert!(o.require && o.verbose);
     }
 
     #[test]

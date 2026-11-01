@@ -19,7 +19,13 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 /// `baton` with no jobserver in its environment, unless one is configured.
 fn baton(client: Option<&Client>) -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_baton"));
-    for var in ["MAKEFLAGS", "CARGO_MAKEFLAGS", "MFLAGS"] {
+    for var in [
+        "MAKEFLAGS",
+        "CARGO_MAKEFLAGS",
+        "MFLAGS",
+        "BATON_VERBOSE",
+        "BATON_REQUIRE",
+    ] {
         cmd.env_remove(var);
     }
     if let Some(client) = client {
@@ -72,12 +78,29 @@ fn stdout(out: &Output) -> String {
     String::from_utf8_lossy(&out.stdout).trim().to_owned()
 }
 
-/// Bytes waiting in a pipe or fifo, i.e. free tokens.
-fn queued(file: &File) -> usize {
-    let mut n: libc::c_int = 0;
-    let rc = unsafe { libc::ioctl(file.as_raw_fd(), libc::FIONREAD, &mut n) };
-    assert_eq!(rc, 0, "FIONREAD");
-    n as usize
+/// Free tokens in a fifo: drains it without blocking and writes the bytes
+/// back. (FIONREAD on a fifo reads 0 on macOS.)
+fn queued(mut fifo: &File) -> usize {
+    let fd = fifo.as_raw_fd();
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    assert!(flags >= 0, "F_GETFL");
+    assert_eq!(
+        unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) },
+        0
+    );
+    let mut tokens = Vec::new();
+    let mut buf = [0; 64];
+    loop {
+        match fifo.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => tokens.extend_from_slice(&buf[..n]),
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+            Err(e) => panic!("read fifo: {e}"),
+        }
+    }
+    assert_eq!(unsafe { libc::fcntl(fd, libc::F_SETFL, flags) }, 0);
+    fifo.write_all(&tokens).expect("refill fifo");
+    tokens.len()
 }
 
 #[test]
@@ -114,6 +137,7 @@ fn fifo_jobserver_gets_back_the_exact_bytes() {
         .expect("open fifo");
     // steve hands out NUL bytes; they must come back unchanged.
     fifo.write_all(&[0, 0, 0]).expect("fill fifo");
+    assert_eq!(queued(&fifo), 3);
 
     let child = baton(None)
         .env(
@@ -301,5 +325,74 @@ fn serve_shares_a_new_jobserver_with_the_command() {
         lines
             .next()
             .is_some_and(|l| l.contains("--jobserver-auth="))
+    );
+}
+
+fn stderr(out: &Output) -> String {
+    String::from_utf8_lossy(&out.stderr).into_owned()
+}
+
+#[test]
+fn require_fails_without_a_jobserver() {
+    let dir = scratch();
+    let ran = dir.join("ran");
+    let flag = baton(None)
+        .args(["--require", "--", "touch"])
+        .arg(&ran)
+        .output()
+        .expect("run baton");
+    let env = baton(None)
+        .env("BATON_REQUIRE", "1")
+        .args(["--", "touch"])
+        .arg(&ran)
+        .output()
+        .expect("run baton");
+    for out in [flag, env] {
+        assert_eq!(out.status.code(), Some(1));
+        assert!(
+            stderr(&out).contains("--require: no jobserver"),
+            "{}",
+            stderr(&out)
+        );
+    }
+    assert!(!ran.exists(), "ran without a jobserver");
+
+    let off = baton(None)
+        .env("BATON_REQUIRE", "0")
+        .args(["--", "true"])
+        .output()
+        .expect("run baton");
+    assert!(off.status.success());
+}
+
+#[test]
+fn require_runs_with_a_jobserver() {
+    let client = Client::new(2).expect("jobserver");
+    let out = baton(Some(&client))
+        .args(["--require", "-n", "2", "--", "sh", "-c", "echo $BATON_JOBS"])
+        .output()
+        .expect("run baton");
+    assert!(out.status.success());
+    assert_eq!(stdout(&out), "2");
+}
+
+#[test]
+fn baton_verbose_env_prints_the_grant() {
+    let quiet = baton(None)
+        .args(["-n", "2", "--", "true"])
+        .output()
+        .expect("run baton");
+    assert!(!stderr(&quiet).contains("jobs="));
+
+    let out = baton(None)
+        .env("BATON_VERBOSE", "1")
+        .args(["-n", "2", "--", "true"])
+        .output()
+        .expect("run baton");
+    assert!(out.status.success());
+    assert!(
+        stderr(&out).contains("baton: jobs=2 (no jobserver)"),
+        "{}",
+        stderr(&out)
     );
 }

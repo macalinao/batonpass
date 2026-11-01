@@ -5,12 +5,13 @@ resolver = "3"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 license = "Apache-2.0"
 description = "Run a command with a share of the GNU make jobserver's tokens"
 repository = "https://github.com/macalinao/batonpass"
 homepage = "https://github.com/macalinao/batonpass"
 readme = "README.md"
-keywords = ["jobserver", "make", "parallelism", "cli", "steve"]
+keywords = ["jobserver", "make", "parallelism", "cli", "build"]
 categories = ["command-line-utilities", "development-tools::build-utils"]
 authors = ["Ian Macalinao <me@ianm.com>"]
 
@@ -22,3 +23,10 @@ signal-hook = { version = "0.3", features = ["extended-siginfo"] }
 
 [workspace.lints.clippy]
 unwrap_used = "deny"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+# Not panic = "abort": unwinding runs the drops that write tokens back to the
+# jobserver, so a panic doesn't leak them from a shared pool.

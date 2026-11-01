@@ -1,6 +1,8 @@
-# Used once the repo goes public; see "Going public" in README.md.
+# Runs from .github/workflows/release-plz.yml once the repo is public.
 [workspace]
 changelog_update = true
 git_tag_enable = true
+# release-binaries.yml and the binstall pkg-url expect this tag.
+git_tag_name = "v{{ version }}"
 git_release_enable = true
 publish = true
