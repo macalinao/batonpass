@@ -1,0 +1,6 @@
+# Used once the repo goes public; see "Going public" in README.md.
+[workspace]
+changelog_update = true
+git_tag_enable = true
+git_release_enable = true
+publish = true

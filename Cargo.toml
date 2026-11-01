@@ -1,0 +1,24 @@
+[workspace]
+members = ["crates/batonpass"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Run a command with a share of the GNU make jobserver's tokens"
+repository = "https://github.com/macalinao/batonpass"
+homepage = "https://github.com/macalinao/batonpass"
+readme = "README.md"
+keywords = ["jobserver", "make", "parallelism", "cli", "steve"]
+categories = ["command-line-utilities", "development-tools::build-utils"]
+authors = ["Ian Macalinao <me@ianm.com>"]
+
+[workspace.dependencies]
+bpaf = { version = "0.9", features = ["derive"] }
+jobserver = "0.1.35"
+libc = "0.2"
+signal-hook = { version = "0.3", features = ["extended-siginfo"] }
+
+[workspace.lints.clippy]
+unwrap_used = "deny"

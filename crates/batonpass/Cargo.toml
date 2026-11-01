@@ -1,0 +1,25 @@
+[package]
+name = "batonpass"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "baton"
+path = "src/main.rs"
+
+[dependencies]
+bpaf.workspace = true
+jobserver.workspace = true
+libc.workspace = true
+signal-hook.workspace = true
+
+[lints]
+workspace = true
