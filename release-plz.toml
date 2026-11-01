@@ -11,3 +11,16 @@ publish = true
 name = "batonpass"
 # One crate: keep the changelog at the repo root, next to the README.
 changelog_path = "CHANGELOG.md"
+
+# release-plz's Keep a Changelog groups, minus commits users don't care about.
+[changelog]
+commit_parsers = [
+  { message = "(?i)^(ci|chore|build|test|style)(\\(.*\\))?!?:", skip = true },
+  { message = "^feat", group = "added" },
+  { message = "^changed", group = "changed" },
+  { message = "^deprecated", group = "deprecated" },
+  { message = "^removed", group = "removed" },
+  { message = "^fix", group = "fixed" },
+  { message = "^security", group = "security" },
+  { message = ".*", group = "other" },
+]
